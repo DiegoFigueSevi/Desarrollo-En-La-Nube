@@ -1,8 +1,10 @@
-import { Button, TextField, Typography, Container, Box, Paper } from '@mui/material';
+import { Button, TextField, Typography, Container, Box, Paper, Link, Alert } from '@mui/material';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { Link } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../../application/contexts/AuthContext';
+import { useEffect, useState } from 'react';
 
 const schema = yup.object({
   email: yup.string().email('Ingrese un correo válido').required('El correo es requerido'),
@@ -15,13 +17,32 @@ const schema = yup.object({
 type FormData = yup.InferType<typeof schema>;
 
 export const SignUp = () => {
+  const { signUp, error, loading } = useAuth();
+  const navigate = useNavigate();
+  const [signupError, setSignupError] = useState<string | null>(null);
+
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: yupResolver(schema),
   });
 
-  const onSubmit = (data: FormData) => {
-    console.log(data);
-    // Handle signup logic here
+  useEffect(() => {
+    if (error) {
+      setSignupError(error);
+    }
+  }, [error]);
+
+  const onSubmit = async (data: FormData) => {
+    setSignupError(null);
+    const { user, error: signUpError } = await signUp({
+      email: data.email,
+      password: data.password
+    });
+    
+    if (signUpError) {
+      setSignupError(signUpError);
+    } else if (user) {
+      navigate('/');
+    }
   };
 
   return (
@@ -33,53 +54,64 @@ export const SignUp = () => {
             Crear Cuenta
           </Typography>
           
-          <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ mt: 1, width: '100%' }}>
+          <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ mt: 3, width: '100%' }}>
+            {signupError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {signupError}
+              </Alert>
+            )}
             <TextField
               margin="normal"
+              required
               fullWidth
               id="email"
               label="Correo Electrónico"
               autoComplete="email"
               autoFocus
+              disabled={loading}
               {...register('email')}
               error={!!errors.email}
               helperText={errors.email?.message}
             />
             <TextField
               margin="normal"
+              required
               fullWidth
               label="Contraseña"
               type="password"
               id="password"
+              autoComplete="new-password"
+              disabled={loading}
               {...register('password')}
               error={!!errors.password}
               helperText={errors.password?.message}
             />
             <TextField
               margin="normal"
+              required
               fullWidth
               label="Confirmar Contraseña"
               type="password"
               id="confirmPassword"
+              autoComplete="new-password"
+              disabled={loading}
               {...register('confirmPassword')}
               error={!!errors.confirmPassword}
               helperText={errors.confirmPassword?.message}
             />
-            
             <Button
               type="submit"
               fullWidth
               variant="contained"
+              disabled={loading}
               sx={{ mt: 3, mb: 2 }}
             >
-              Registrarse
+              {loading ? 'Creando cuenta...' : 'Registrarse'}
             </Button>
             
             <Box sx={{ textAlign: 'center', mt: 2 }}>
-              <Link to="/login" style={{ textDecoration: 'none' }}>
-                <Typography variant="body2" color="primary">
-                  ¿Ya tienes una cuenta? Inicia sesión
-                </Typography>
+              <Link component={RouterLink} to="/login" color="primary" underline="hover">
+                ¿Ya tienes una cuenta? Inicia sesión
               </Link>
             </Box>
           </Box>
