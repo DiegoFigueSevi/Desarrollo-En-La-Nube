@@ -26,7 +26,13 @@ export const Login = () => {
 
   const onSubmit = async (data: FormData) => {
     setLoginError(null);
-    const { user, error: signInError } = await signIn(data);
+    const { user, error: signInError } = await signIn({
+      email: data.email,
+      password: data.password,
+      username: '', // These fields are required by the interface but not used for login
+      age: 0,
+      cellphone: ''
+    });
     if (user) {
       navigate('/');
     } else if (signInError) {

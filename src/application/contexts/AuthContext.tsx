@@ -1,10 +1,20 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import type { User } from 'firebase/auth';
-import { authRepository } from '../../infrastructure/repositories';
+import { authRepository, db } from '../../infrastructure/repositories';
+import { doc, getDoc } from 'firebase/firestore';
 import type { AuthCredentials, AuthResponse } from '../../domain/interfaces/services/auth.service';
+
+type UserData = {
+  uid: string;
+  email: string;
+  username?: string;
+  displayName?: string;
+  // Add other user fields as needed
+};
 
 type AuthState = {
   user: User | null;
+  userData: UserData | null;
   loading: boolean;
   error: string | null;
 };
@@ -22,13 +32,33 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const initialState: AuthState = {
   user: null,
+  userData: null,
   loading: true,
   error: null,
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<AuthState>(initialState);
-  const { user, loading, error } = state;
+  const { user, userData, loading, error } = state;
+
+  const fetchUserData = useCallback(async (user: User): Promise<UserData | null> => {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        return {
+          uid: user.uid,
+          email: data.email || user.email || '',
+          username: data.username,
+          displayName: data.displayName || user.displayName || undefined,
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      return null;
+    }
+  }, []);
 
   // Clear any auth errors
   const clearError = useCallback(() => {
@@ -39,13 +69,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let isMounted = true;
     
-    const onUserChanged = (currentUser: User | null) => {
-      if (isMounted) {
-        setState({
-          user: currentUser,
-          loading: false,
-          error: null,
-        });
+    const onUserChanged = async (currentUser: User | null) => {
+      if (!isMounted) return;
+      
+      if (currentUser) {
+        try {
+          const userData = await fetchUserData(currentUser);
+          if (isMounted) {
+            setState({
+              user: currentUser,
+              userData,
+              loading: false,
+              error: null,
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+          if (isMounted) {
+            setState({
+              user: currentUser,
+              userData: null,
+              loading: false,
+              error: 'Error al cargar los datos del usuario',
+            });
+          }
+        }
+      } else {
+        if (isMounted) {
+          setState({
+            user: null,
+            userData: null,
+            loading: false,
+            error: null,
+          });
+        }
       }
     };
 
@@ -56,7 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isMounted = false;
       unsubscribe();
     };
-  }, []);
+  }, [fetchUserData]);
 
   const handleAuthResponse = useCallback(async (
     authPromise: Promise<AuthResponse>
@@ -75,66 +132,85 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return result;
       }
       
-      setState(prev => ({
-        ...prev,
-        user: result.user,
-        loading: false,
-        error: null,
-      }));
+      if (result.user) {
+        try {
+          const userData = await fetchUserData(result.user);
+          setState(prev => ({
+            ...prev,
+            user: result.user,
+            userData,
+            loading: false,
+          }));
+          return result;
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+          setState(prev => ({
+            ...prev,
+            user: result.user,
+            userData: null,
+            loading: false,
+            error: 'Error al cargar los datos del usuario',
+          }));
+          return result;
+        }
+      }
       
+      setState(prev => ({ ...prev, loading: false }));
       return result;
     } catch (error) {
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : 'Ocurrió un error inesperado. Por favor, inténtalo de nuevo.';
-      
+      console.error('Auth error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error de autenticación';
       setState(prev => ({
         ...prev,
         loading: false,
         error: errorMessage,
       }));
-      
-      return { user: null, error: errorMessage };
+      throw error;
     }
-  }, []);
+  }, [fetchUserData]);
 
-  const signIn = useCallback((credentials: AuthCredentials): Promise<AuthResponse> => {
-    return handleAuthResponse(authRepository.signInWithEmail(credentials));
-  }, [handleAuthResponse]);
+  const signIn = useCallback((credentials: AuthCredentials) => 
+    handleAuthResponse(authRepository.signInWithEmail(credentials)),
+    [handleAuthResponse]
+  );
 
-  const signUp = useCallback((credentials: AuthCredentials): Promise<AuthResponse> => {
-    return handleAuthResponse(authRepository.signUpWithEmail(credentials));
-  }, [handleAuthResponse]);
+  const signUp = useCallback((credentials: AuthCredentials) => 
+    handleAuthResponse(authRepository.signUpWithEmail(credentials)),
+    [handleAuthResponse]
+  );
 
-  const signInWithGoogle = useCallback((): Promise<AuthResponse> => {
-    return handleAuthResponse(authRepository.signInWithGoogle());
-  }, [handleAuthResponse]);
+  const signInWithGoogle = useCallback(
+    () => handleAuthResponse(authRepository.signInWithGoogle()),
+    [handleAuthResponse]
+  );
 
-  const signInWithFacebook = useCallback((): Promise<AuthResponse> => {
-    return handleAuthResponse(authRepository.signInWithFacebook());
-  }, [handleAuthResponse]);
+  const signInWithFacebook = useCallback(
+    () => handleAuthResponse(authRepository.signInWithFacebook()),
+    [handleAuthResponse]
+  );
 
-  const signOut = useCallback(async (): Promise<void> => {
+  const signOut = useCallback(async () => {
     try {
-      setState(prev => ({ ...prev, loading: true }));
       await authRepository.signOut();
       setState({
         user: null,
+        userData: null,
         loading: false,
         error: null,
       });
     } catch (error) {
+      console.error('Error signing out:', error);
       setState(prev => ({
         ...prev,
-        loading: false,
-        error: 'Error al cerrar sesión. Por favor, inténtalo de nuevo.',
+        error: 'Error al cerrar sesión',
       }));
     }
   }, []);
 
   // Memoize the context value to prevent unnecessary re-renders
-  const value = useMemo<AuthContextType>(() => ({
+  const value = useMemo(() => ({
     user,
+    userData,
     loading,
     error,
     signIn,
@@ -145,6 +221,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearError,
   }), [
     user,
+    userData,
     loading,
     error,
     signIn,
@@ -155,7 +232,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearError,
   ]);
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = (): AuthContextType => {

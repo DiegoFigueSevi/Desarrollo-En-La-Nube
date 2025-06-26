@@ -10,7 +10,9 @@ import {
   type User,
   type AuthError
 } from 'firebase/auth';
-import { firebaseApp } from '../firebase';
+import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { firebaseApp, db } from '../firebase/firebase.config';
+import type { UserData } from '../../domain/interfaces/services/auth.service';
 import type { IAuthService, AuthCredentials, AuthResponse } from '../../domain/interfaces/services/auth.service';
 
 export class FirebaseAuthRepository implements IAuthService {
@@ -28,13 +30,43 @@ export class FirebaseAuthRepository implements IAuthService {
     }
   }
 
-  async signUpWithEmail({ email, password }: AuthCredentials): Promise<AuthResponse> {
+  async signUpWithEmail(credentials: AuthCredentials): Promise<AuthResponse> {
     try {
+      const { email, password, username, age, cellphone } = credentials;
+      
+      // Create the user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(this.auth, email, password);
-      return { user: userCredential.user };
+      const { user } = userCredential;
+      
+      // Create user data in Firestore
+      await this.createUserData({
+        email,
+        username,
+        age,
+        cellphone
+      }, user.uid);
+      
+      return { user };
     } catch (error: unknown) {
       const authError = error as AuthError;
       return { user: null, error: this.getErrorMessage(authError.code) };
+    }
+  }
+  
+  async createUserData(userData: Omit<UserData, 'uid' | 'createdAt' | 'updatedAt'>, uid: string): Promise<void> {
+    try {
+      const userRef = doc(collection(db, 'users'), uid);
+      const now = serverTimestamp();
+      
+      await setDoc(userRef, {
+        ...userData,
+        uid,
+        createdAt: now,
+        updatedAt: now,
+      }, { merge: true });
+    } catch (error) {
+      console.error('Error creating user data:', error);
+      throw new Error('Error al guardar los datos del usuario');
     }
   }
 

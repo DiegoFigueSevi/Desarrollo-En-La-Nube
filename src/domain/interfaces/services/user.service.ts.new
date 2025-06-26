@@ -1,0 +1,7 @@
+import type { UserData } from './auth.service';
+
+export interface IUserService {
+  getUserData(uid: string): Promise<UserData | null>;
+}
+
+export type { UserData };
