@@ -9,7 +9,7 @@ type UserData = {
   email: string;
   username?: string;
   displayName?: string;
-  // Add other user fields as needed
+  photoURL?: string;
 };
 
 type AuthState = {
@@ -51,6 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: data.email || user.email || '',
           username: data.username,
           displayName: data.displayName || user.displayName || undefined,
+          photoURL: data.photoURL || user.photoURL || undefined,
         };
       }
       return null;
@@ -60,12 +61,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Clear any auth errors
   const clearError = useCallback(() => {
     setState(prev => ({ ...prev, error: null }));
   }, []);
 
-  // Set up auth state listener
   useEffect(() => {
     let isMounted = true;
     
@@ -108,7 +107,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const unsubscribe = authRepository.onAuthStateChanged(onUserChanged);
 
-    // Cleanup function
     return () => {
       isMounted = false;
       unsubscribe();
@@ -207,7 +205,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Memoize the context value to prevent unnecessary re-renders
   const value = useMemo(() => ({
     user,
     userData,
