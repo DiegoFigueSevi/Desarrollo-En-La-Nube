@@ -1,4 +1,4 @@
-import { Typography, Button, Paper, Avatar, Box, Divider, List, ListItem, ListItemIcon, ListItemText, TextField, Container, Card, CardHeader, CardContent, CardActions, IconButton, CircularProgress } from '@mui/material';
+import { Typography, Button, Paper, Avatar, Box, Divider, List, ListItem, ListItemIcon, ListItemText, TextField, Container, Card, CardHeader, CardContent, CardActions, IconButton, CircularProgress, AppBar, Toolbar } from '@mui/material';
 import { Image, Cancel } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../application/contexts/AuthContext';
@@ -12,6 +12,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import SendIcon from '@mui/icons-material/Send';
 import { postRepository } from '../../../infrastructure/repositories';
 import type { Post } from '../../../domain/interfaces/services/post.service';
+import { Notifications } from '../../components/Notifications/Notifications';
 
 export const Home = () => {
   const { user, userData, signOut, loading: authLoading } = useAuth();
@@ -139,23 +140,47 @@ export const Home = () => {
   }
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Paper elevation={3} sx={{ p: 4, maxWidth: 600, width: '100%' }}>
-        <Box textAlign="center" mb={3}>
-          <Avatar 
-            src={user.photoURL || ''}
-            alt={userData?.displayName || user.displayName || 'Usuario'}
-            sx={{ 
-              width: 100, 
-              height: 100, 
-              margin: '0 auto 16px',
-              bgcolor: 'primary.main',
-              fontSize: '2.5rem',
-              textTransform: 'uppercase',
-            }}
-          >
-            {(userData?.displayName?.[0] || user.displayName?.[0] || user.email?.[0] || 'U')}
-          </Avatar>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <AppBar position="static">
+        <Toolbar>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            Mi Aplicación
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Notifications />
+            <Avatar 
+              src={user.photoURL || ''}
+              alt={userData?.displayName || user.displayName || 'Usuario'}
+              sx={{ 
+                width: 40, 
+                height: 40,
+                bgcolor: 'secondary.main',
+                textTransform: 'uppercase',
+              }}
+            >
+              {(userData?.displayName?.[0] || user.displayName?.[0] || user.email?.[0] || 'U').toUpperCase()}
+            </Avatar>
+          </Box>
+        </Toolbar>
+      </AppBar>
+      
+      <Container maxWidth="md" sx={{ py: 4, flex: 1 }}>
+        <Paper elevation={3} sx={{ p: 4, maxWidth: 600, width: '100%', mb: 4 }}>
+          <Box textAlign="center">
+            <Avatar 
+              src={user.photoURL || ''}
+              alt={userData?.displayName || user.displayName || 'Usuario'}
+              sx={{ 
+                width: 100, 
+                height: 100, 
+                margin: '0 auto 16px',
+                bgcolor: 'primary.main',
+                fontSize: '2.5rem',
+                textTransform: 'uppercase',
+              }}
+            >
+              {(userData?.displayName?.[0] || user.displayName?.[0] || user.email?.[0] || 'U').toUpperCase()}
+            </Avatar>
           
           <Typography variant="h4" component="h1" gutterBottom>
             ¡Bienvenido{userData?.displayName ? `, ${userData.displayName}` : user.displayName ? `, ${user.displayName}` : ''}!
@@ -331,7 +356,7 @@ export const Home = () => {
         </form>
       </Paper>
 
-      <Box sx={{ mt: 4 }}>
+      <Paper elevation={3} sx={{ p: 3, mt: 4, mb: 4 }}>
         <Typography variant="h5" gutterBottom>
           Publicaciones
         </Typography>
@@ -341,11 +366,11 @@ export const Home = () => {
             <CircularProgress />
           </Box>
         ) : posts.length === 0 ? (
-          <Paper elevation={2} sx={{ p: 3, textAlign: 'center' }}>
+          <Box sx={{ p: 3, textAlign: 'center' }}>
             <Typography color="text.secondary">
               No hay publicaciones aún. ¡Sé el primero en publicar algo!
             </Typography>
-          </Paper>
+          </Box>
         ) : (
           <Box sx={{ display: 'grid', gap: 3 }}>
             {posts.map((post) => (
@@ -413,8 +438,9 @@ export const Home = () => {
             ))}
           </Box>
         )}
-      </Box>
-    </Container>
+      </Paper>
+      </Container>
+    </Box>
   );
 };
 

@@ -1,7 +1,8 @@
-import { collection, addDoc, getDocs, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, serverTimestamp, query, orderBy, where } from 'firebase/firestore';
 import { db } from '../firebase/firebase.config';
 import type { IPostService, Post } from '../../domain/interfaces/services/post.service';
 import { uploadToCloudinary } from '../cloudinary';
+import { notificationRepository } from './firebase-notification.repository';
 
 export class FirebasePostRepository implements IPostService {
   private readonly postsCollection = collection(db, 'posts');
@@ -17,6 +18,26 @@ export class FirebasePostRepository implements IPostService {
       };
 
       const docRef = await addDoc(this.postsCollection, postData);
+      
+      // Get all users except the one who created the post
+      const usersCollection = collection(db, 'users');
+      const usersQuery = query(usersCollection, where('uid', '!=', post.uid));
+      const usersSnapshot = await getDocs(usersQuery);
+
+      // Send notifications to all other users
+      const notificationPromises = usersSnapshot.docs.map(async (userDoc) => {
+        const userData = userDoc.data();
+        await notificationRepository.sendNotification({
+          recipientUid: userData.uid,
+          senderDisplayName: post.displayName,
+          senderPhotoURL: post.photoURL || null,
+          type: 'new_post',
+          postId: docRef.id
+        });
+      });
+
+      // Wait for all notifications to be sent
+      await Promise.all(notificationPromises);
       
       return {
         ...post,
