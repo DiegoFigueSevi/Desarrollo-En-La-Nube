@@ -81,9 +81,8 @@ export const Home = () => {
 
       if (selectedImage) {
         try {
-          const { url, path } = await postRepository.uploadImage(selectedImage, user.uid);
-          newPost.imageURL = url;
-          newPost.imagePath = path;
+          const { url } = await postRepository.uploadImage(selectedImage);
+          newPost.photoURL = url;
         } catch (error) {
           console.error('Error uploading image:', error);
           throw new Error('Error al subir la imagen');
@@ -367,26 +366,36 @@ export const Home = () => {
                   />
                   <CardContent>
                     {post.content && (
-                      <Typography variant="body1" component="div" whiteSpace="pre-wrap" sx={{ mb: post.imageURL ? 2 : 0 }}>
+                      <Typography variant="body1" component="div" whiteSpace="pre-wrap" sx={{ mb: post.photoURL ? 2 : 0 }}>
                         {post.content}
                       </Typography>
                     )}
-                    {post.imageURL && (
+                    {post.photoURL && (
                       <Box sx={{ 
+                        mt: 2,
                         borderRadius: 1, 
                         overflow: 'hidden',
                         maxWidth: '100%',
-                        margin: '0 auto'
+                        margin: '0 auto',
+                        backgroundColor: '#f5f5f5',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        minHeight: '200px'
                       }}>
                         <img 
-                          src={post.imageURL} 
+                          src={post.photoURL} 
                           alt="Post content" 
                           style={{ 
                             maxWidth: '100%',
-                            maxHeight: '400px',
+                            maxHeight: '500px',
+                            width: 'auto',
+                            height: 'auto',
+                            objectFit: 'contain',
                             display: 'block',
                             margin: '0 auto'
                           }} 
+                          loading="lazy"
                         />
                       </Box>
                     )}

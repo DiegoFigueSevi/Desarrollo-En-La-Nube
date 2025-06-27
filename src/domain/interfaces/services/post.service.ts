@@ -14,6 +14,5 @@ export interface Post {
 export interface IPostService {
   createPost(post: Omit<Post, 'id' | 'createdAt'>): Promise<Post>;
   getPosts(): Promise<Post[]>;
-  uploadImage(file: File, userId: string): Promise<{ url: string; path: string }>;
-  deleteImage(path: string): Promise<void>;
+  uploadImage(file: File): Promise<{ url: string }>;
 }

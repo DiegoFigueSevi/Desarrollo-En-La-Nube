@@ -1,15 +1,10 @@
-import { collection, addDoc, getDocs, serverTimestamp, query, orderBy, Timestamp } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { collection, addDoc, getDocs, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import { db } from '../firebase/firebase.config';
 import type { IPostService, Post } from '../../domain/interfaces/services/post.service';
-
-type FirestorePost = Omit<Post, 'id' | 'createdAt'> & {
-  createdAt: Timestamp;
-};
+import { uploadToCloudinary } from '../cloudinary';
 
 export class FirebasePostRepository implements IPostService {
   private readonly postsCollection = collection(db, 'posts');
-  private readonly storage = getStorage();
 
   async createPost(post: Omit<Post, 'id' | 'createdAt'>): Promise<Post> {
     try {
@@ -17,8 +12,8 @@ export class FirebasePostRepository implements IPostService {
         uid: post.uid,
         displayName: post.displayName,
         content: post.content,
-        createdAt: serverTimestamp(),
-        ...(post.photoURL && { photoURL: post.photoURL })
+        photoURL: post.photoURL || null,
+        createdAt: serverTimestamp()
       };
 
       const docRef = await addDoc(this.postsCollection, postData);
@@ -26,7 +21,7 @@ export class FirebasePostRepository implements IPostService {
       return {
         ...post,
         id: docRef.id,
-        createdAt: new Date(),
+        createdAt: new Date()
       };
     } catch (error) {
       console.error('Error creating post:', error);
@@ -56,34 +51,12 @@ export class FirebasePostRepository implements IPostService {
     }
   }
 
-  async uploadImage(file: File, userId: string): Promise<{ url: string; path: string }> {
+  async uploadImage(file: File): Promise<{ url: string }> {
     try {
-      const storagePath = `posts/${userId}/${Date.now()}_${file.name}`;
-      const storageRef = ref(this.storage, storagePath);
-      
-      const snapshot = await uploadBytes(storageRef, file);
-      
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      
-      return {
-        url: downloadURL,
-        path: storagePath
-      };
+      return await uploadToCloudinary(file);
     } catch (error) {
-      console.error('Error uploading image:', error);
-      throw new Error('Error al subir la imagen');
-    }
-  }
-
-  async deleteImage(path: string): Promise<void> {
-    try {
-      if (!path) return;
-      
-      const imageRef = ref(this.storage, path);
-      await deleteObject(imageRef);
-    } catch (error) {
-      console.error('Error deleting image:', error);
-      throw new Error('Error al eliminar la imagen');
+      console.error('Error uploading image to Cloudinary:', error);
+      throw new Error('Error al subir la imagen a Cloudinary');
     }
   }
 }
